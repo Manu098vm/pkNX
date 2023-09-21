@@ -21,7 +21,7 @@ public class GameManagerPLA : GameManager
     /// </summary>
     public GameData8a Data { get; protected set; } = null!;
 
-    public VirtualFileSystem VFS { get; private set; }
+    public VirtualFileSystem VFS { get; private set; } = null!;
 
     protected override void SetMitm()
     {
@@ -33,13 +33,11 @@ public class GameManagerPLA : GameManager
         var redirect = Path.Combine(basePath, tid);
         FileMitm.SetRedirect(basePath, redirect);
 
-        // VFS test
         var cleanRomFS = new PhysicalFileSystem(basePath + "/romfs/").AsReadOnlyFileSystem();
         var moddedRomFS = new PhysicalFileSystem(redirect + "/romfs/");
 
         var layeredFS = new LayeredFileSystem(moddedRomFS, cleanRomFS);
         VFS = new VirtualFileSystem(new MountPoint("/romfs/", layeredFS));
-        var file = VFS.OpenFile("/romfs/bin/pokemon/data/poke_ai.bin", FileAccess.Read);
     }
 
     public override void Initialize()

@@ -38,7 +38,7 @@ public partial class MapViewer8a : Form
         var speciesNames = ROM.GetStrings(TextName.SpeciesNames);
         var pt = rom.Data.PersonalData;
         var nameList = new List<ComboItem>();
-        foreach (var e in pt.Table.Cast<IPersonalMisc_1>())
+        foreach (var e in pt.Table.Cast<IPersonalMisc_SWSH>())
         {
             if (!e.IsPresentInGame)
                 continue;
@@ -275,12 +275,12 @@ public class AreaDef
     public readonly string NameSummary;
     public readonly int Min;
     public readonly int Max;
-    public readonly pkNX.Structures.FlatBuffers.Arceus.Vec3f Position;
+    public readonly pkNX.Structures.FlatBuffers.Vec3f Position;
     public readonly SpawnerType Type;
     public readonly IList<EncounterSlot> Slots;
     public readonly float Radius;
 
-    public AreaDef(string NameSummary, int min, int max, pkNX.Structures.FlatBuffers.Arceus.Vec3f position, SpawnerType type, IList<EncounterSlot> slots, float radius)
+    public AreaDef(string NameSummary, int min, int max, pkNX.Structures.FlatBuffers.Vec3f position, SpawnerType type, IList<EncounterSlot> slots, float radius)
     {
         this.NameSummary = NameSummary;
         Min = min;

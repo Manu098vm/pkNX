@@ -14,7 +14,7 @@ public sealed class PersonalInfo5B2W2 : IPersonalInfoB2W2
 
     public bool[] TMHM { get; set; }
     public bool[] TypeTutors { get; set; }
-    public bool[][] SpecialTutors { get; set; }
+    public bool[] SpecialTutors { get; set; }
 
     public PersonalInfo5B2W2(byte[] data)
     {
@@ -22,23 +22,14 @@ public sealed class PersonalInfo5B2W2 : IPersonalInfoB2W2
         // Unpack TMHM & Tutors
         TMHM = GetBits(data.AsSpan(0x28, 0x10));
         TypeTutors = GetBits(data.AsSpan(0x38, 0x4));
-        SpecialTutors = new[]
-        {
-            GetBits(data.AsSpan(0x3C, 0x04)),
-            GetBits(data.AsSpan(0x40, 0x04)),
-            GetBits(data.AsSpan(0x44, 0x04)),
-            GetBits(data.AsSpan(0x48, 0x04)),
-        };
+        SpecialTutors = GetBits(data.AsSpan(0x3C, 0x16)); // 0x3C - 0x43
     }
 
     public byte[] Write()
     {
         SetBits(TMHM, Data.AsSpan(0x28));
         SetBits(TypeTutors, Data.AsSpan(0x38));
-        SetBits(SpecialTutors[0], Data.AsSpan(0x3C));
-        SetBits(SpecialTutors[1], Data.AsSpan(0x40));
-        SetBits(SpecialTutors[2], Data.AsSpan(0x44));
-        SetBits(SpecialTutors[3], Data.AsSpan(0x48));
+        SetBits(SpecialTutors, Data.AsSpan(0x3C));
         return Data;
     }
 
@@ -64,7 +55,7 @@ public sealed class PersonalInfo5B2W2 : IPersonalInfoB2W2
     public int Item2 { get => ReadInt16LittleEndian(Data.AsSpan(0x0E)); set => WriteInt16LittleEndian(Data.AsSpan(0x0E), (short)value); }
     public int Item3 { get => ReadInt16LittleEndian(Data.AsSpan(0x10)); set => WriteInt16LittleEndian(Data.AsSpan(0x10), (short)value); }
     public int Gender { get => Data[0x12]; set => Data[0x12] = (byte)value; }
-    public int HatchCycles { get => Data[0x13]; set => Data[0x13] = (byte)value; }
+    public byte HatchCycles { get => Data[0x13]; set => Data[0x13] = value; }
     public int BaseFriendship { get => Data[0x14]; set => Data[0x14] = (byte)value; }
     public int EXPGrowth { get => Data[0x15]; set => Data[0x15] = (byte)value; }
     public int EggGroup1 { get => Data[0x16]; set => Data[0x16] = (byte)value; }

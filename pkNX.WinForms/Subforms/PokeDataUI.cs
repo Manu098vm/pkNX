@@ -271,7 +271,7 @@ public partial class PokeDataUI : Form
 
         TB_Gender.Text = pkm.Gender.ToString("000");
 
-        if (pkm is IPersonalEgg_1 eggInfo)
+        if (pkm is IPersonalEgg_v1 eggInfo)
             TB_HatchCycles.Text = eggInfo.HatchCycles.ToString("000");
 
         TB_Friendship.Text = pkm.BaseFriendship.ToString("000");
@@ -327,14 +327,14 @@ public partial class PokeDataUI : Form
             L_CallRate.Visible = TB_CallRate.Visible = GB_ZMove.Visible = false;
         }
 
-        if (pkm is IMovesInfo_1 mi)
+        if (pkm is IMovesInfo_v1 mi)
         {
             int halfList = CLB_TM.Items.Count / 2;
             int fullList = CLB_TM.Items.Count;
-        
+
             for (int i = 0; i < halfList; i++)
                 CLB_TM.SetItemChecked(i, mi.TMHM[i]); // Bitflags for TM
-                
+
             if (pkm is IMovesInfo_SWSH mitr) // if SWSH, the second half is just TRs
             {
                 for (int i = 0; i < halfList; i++)
@@ -345,15 +345,15 @@ public partial class PokeDataUI : Form
                 for (int i = halfList; i < fullList; i++) // not SWSH, finish the remaining TMs
                     CLB_TM.SetItemChecked(i, mi.TMHM[i]);
             }
-            
+
             for (int i = 0; i < CLB_TypeTutor.Items.Count; i++)
                 CLB_TypeTutor.SetItemChecked(i, mi.TypeTutors[i]);
         }
 
-        if (pkm is IMovesInfo_2 mi2)
+        if (pkm is IMovesInfo_B2W2 mi2)
         {
             for (int i = 0; i < CLB_SpecialTutor.Items.Count; i++)
-                CLB_SpecialTutor.SetItemChecked(i, mi2.SpecialTutors[0][i]);
+                CLB_SpecialTutor.SetItemChecked(i, mi2.SpecialTutors[i]);
         }
     }
 
@@ -385,8 +385,8 @@ public partial class PokeDataUI : Form
 
         pkm.Gender = Util.ToInt32(TB_Gender.Text);
 
-        if (pkm is IPersonalEgg_1 eggInfo)
-            eggInfo.HatchCycles = Util.ToInt32(TB_HatchCycles.Text);
+        if (pkm is IPersonalEgg_v1 eggInfo)
+            eggInfo.HatchCycles = Convert.ToByte(TB_HatchCycles.Text);
 
         pkm.BaseFriendship = Util.ToInt32(TB_Friendship.Text);
         pkm.EXPGrowth = (byte)CB_EXPGroup.SelectedIndex;
@@ -429,14 +429,14 @@ public partial class PokeDataUI : Form
             swsh.CanNotDynamax = CHK_CanNotDynamax.Checked;
         }
 
-        if (pkm is IMovesInfo_1 mi)
+        if (pkm is IMovesInfo_v1 mi)
         {
             int halfList = CLB_TM.Items.Count / 2;
             int fullList = CLB_TM.Items.Count;
-            
+
             for (int i = 0; i < halfList; i++)
                 mi.TMHM[i] = CLB_TM.GetItemChecked(i);
-                
+
             if (pkm is IMovesInfo_SWSH mitr)
             {
                 for (int i = 0; i < halfList; i++)
@@ -447,15 +447,15 @@ public partial class PokeDataUI : Form
                 for (int i = halfList; i < fullList; i++)
                     mi.TMHM[i] = CLB_TM.GetItemChecked(i);
             }
-            
+
             for (int i = 0; i < CLB_TypeTutor.Items.Count; i++)
                 mi.TypeTutors[i] = CLB_TypeTutor.GetItemChecked(i);
         }
 
-        if (pkm is IMovesInfo_2 mi2)
+        if (pkm is IMovesInfo_B2W2 mi2)
         {
             for (int i = 0; i < CLB_SpecialTutor.Items.Count; i++)
-                mi2.SpecialTutors[0][i] = CLB_SpecialTutor.GetItemChecked(i);
+                mi2.SpecialTutors[i] = CLB_SpecialTutor.GetItemChecked(i);
         }
     }
 

@@ -13,7 +13,7 @@ namespace pkNX.WinForms;
 
 public static class TeraRaidRipper
 {
-    public static void DumpRaids(IFileInternal ROM, IReadOnlyList<string> internalRaidFiles, string outPath)
+    public static void DumpRaids(IFileInternal ROM, IReadOnlyList<string> internalRaidFiles, string outPath, string rateFileName, string pickleFileName)
     {
         var list = new List<RaidStorage>();
         var rateTotal = new (int Scarlet, int Violet)[8];
@@ -54,8 +54,8 @@ public static class TeraRaidRipper
             .ToList();
 
         var rateString = string.Join(Environment.NewLine, rateTotal.Select((z, i) => $"{i}\t{z.Scarlet}\t{z.Violet}"));
-        File.WriteAllText(Path.Combine(outPath, "rateTotal.txt"), rateString);
-        WritePickle(outPath, all, "encounter_gem_paldea.pkl");
+        File.WriteAllText(Path.Combine(outPath, rateFileName), rateString);
+        WritePickle(outPath, all, pickleFileName);
         // Raids can be shared, and show up with the same met location regardless of shared vs not.
         // No need to differentiate.
         // var scarlet = all.Where(z => z.Enemy.Info.RomVer != RaidRomType.TYPE_B);
@@ -147,14 +147,23 @@ public static class TeraRaidRipper
         var lottery = Path.Combine(path, "lottery_reward_item_array");
         var priority = Path.Combine(path, "raid_priority_array");
         const string v130 = "_1_3_0";
+        const string v200 = "_2_0_0";
 
         if (!File.Exists(enemy))
             return;
 
-        if (File.Exists(enemy + v130))
+        // Starting with Ver. 1.3.0, BCAT is distributed with patch-specific binaries, in addition to the original base game binaries (e.g. raid_enemy_array_1_3_0).
+        // The original data is dummied out, while the latest patch-specific data contains the raids we want to parse.
+        if (File.Exists(enemy + v200))
         {
-            // Starting with Ver. 1.3.0, BCAT is distributed with 1.3.0 specific binaries, in addition to the original base game binaries (e.g. raid_enemy_array_1_3_0).
-            // The original data is dummied out, while the 1.3.0 data contains the raids we want to parse.
+            enemy += v200;
+            reward += v200;
+            lottery += v200;
+            priority += v200;
+        }
+
+        else if (File.Exists(enemy + v130))
+        {
             enemy += v130;
             reward += v130;
             lottery += v130;
@@ -462,6 +471,13 @@ public static class TeraRaidRipper
                 _ => string.Empty,
             };
 
+            var gender = boss.Sex switch
+            {
+                SexType.MALE => "Male",
+                SexType.FEMALE => "Female",
+                _ => string.Empty,
+            };
+
             var form = boss.FormId == 0 ? string.Empty : $"-{(int)boss.FormId}";
 
             lines.Add($"{entry.Info.Difficulty}-Star {species[(int)boss.DevId]}{form}");
@@ -474,6 +490,9 @@ public static class TeraRaidRipper
 
             if (boss.Seikaku != SeikakuType.DEFAULT)
                 lines.Add($"\tNature: {natures[(int)boss.Seikaku - 1]}");
+
+            if (boss.Sex != SexType.DEFAULT)
+                lines.Add($"\tGender: {gender}");
 
             lines.Add($"\tIVs: {iv}");
 

@@ -131,7 +131,7 @@ public class GameDumperPLA
             List<string> r = new() { $"{moves[move]}:" };
             if (isShop)
             {
-                var species = pt.Table.OfType<IPersonalInfoPLA>().Where(z => z.SpecialTutors[0][shopIndex] && z.IsPresentInGame);
+                var species = pt.Table.OfType<IPersonalInfoPLA>().Where(z => z.SpecialTutors[shopIndex] && z.IsPresentInGame);
                 var names = species.Select(z => $"{spec[z.DexIndexNational]}{(z.Form == 0 ? "" : $"-{z.Form}")}");
                 r.Add($"\tTutors: {string.Join(", ", names)}");
             }
@@ -769,7 +769,7 @@ public class GameDumperPLA
     public void DumpOutbreak()
     {
         var file = ROM.GetFile(GameFile.Outbreak).FilePath;
-        var result = FlatDumper.GetTable<MassOutbreakTable, MassOutbreak>(file!, z=>z.Table);
+        var result = FlatDumper.GetTable<MassOutbreakTable, MassOutbreak>(file!, z => z.Table);
         File.WriteAllText(GetPath("massOutbreak.txt"), result);
 
         var arr = FlatBufferConverter.DeserializeFrom<MassOutbreakTable>(file!).Table;
@@ -989,7 +989,7 @@ public class GameDumperPLA
     private void ChangeLanguage(int index)
     {
         ROM.Language = index;
-        ROM.ResetText();
+        GamePath.Initialize(ROM.Game, ROM.Language);
     }
 
     public void DumpStrings()
@@ -1037,7 +1037,7 @@ public class GameDumperPLA
     public void DumpScriptID()
     {
         var file = Path.Combine(ROM.PathRomFS, "bin", "event", "script_id_record_release.bin");
-        var text = FlatDumper.GetTable<ScriptIDRecordRelease, ScriptIDRecord>(file, z=> z.Table);
+        var text = FlatDumper.GetTable<ScriptIDRecordRelease, ScriptIDRecord>(file, z => z.Table);
         var path = GetPath("scriptCommands.txt");
         File.WriteAllText(path, text);
     }
@@ -1084,7 +1084,7 @@ public class GameDumperPLA
     public void DumpMoveShop()
     {
         var file = ROM.GetFile(GameFile.MoveShop).FilePath;
-        var result = FlatDumper.GetTable<MoveShopTable, MoveShopIndex>(file!, z=>z.Table);
+        var result = FlatDumper.GetTable<MoveShopTable, MoveShopIndex>(file!, z => z.Table);
         File.WriteAllText(GetPath("MoveShop.csv"), result);
     }
 }

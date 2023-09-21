@@ -1,12 +1,15 @@
+using System;
 using System.ComponentModel;
 
-namespace pkNX.Structures.FlatBuffers.Arceus;
+namespace pkNX.Structures.FlatBuffers;
 
 [TypeConverter(typeof(ExpandableObjectConverter))]
 public partial class Vec3f : IEquatable<Vec3f>
 {
     public static readonly Vec3f Zero = new();
-    public static readonly Vec3f One = new(1, 1, 1);
+    public static readonly Vec3f One = new() { X = 1, Y = 1, Z = 1 };
+
+    public static implicit operator Vec3f(PackedVec3f v) => new() { X = v.X, Y = v.Y, Z = v.Z };
 
     public Vec3f(float x = 0, float y = 0, float z = 0)
     {
@@ -47,10 +50,7 @@ public partial class Vec3f : IEquatable<Vec3f>
 
     public override bool Equals(object? obj)
     {
-        if (obj is null) return false;
-        if (ReferenceEquals(this, obj)) return true;
-        if (obj.GetType() != GetType()) return false;
-        return Equals((Vec3f)obj);
+        return obj is Vec3f other && Equals(other);
     }
 
     public override int GetHashCode() => HashCode.Combine(X, Y, Z);

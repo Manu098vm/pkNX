@@ -130,7 +130,7 @@ public sealed class PersonalTable8LA : IPersonalTable, IPersonalTable<PersonalIn
             Debug.Assert(l.DexIndexNational == s.DexIndexNational);
 
             if (l.HP == 0)
-                l.SetPersonalInfo(s);
+                l.ImportPersonalInfo(s);
 
             if (l.FormCount == 1)
                 continue;
@@ -145,6 +145,13 @@ public sealed class PersonalTable8LA : IPersonalTable, IPersonalTable<PersonalIn
             for (byte f = 1; f < l.FormCount; f++)
             {
                 var formL = Table[l.FormStatsIndex + (f - 1)];
+
+                if (formL.Form != f)
+                {
+                    Debug.Assert(formL.Form == f);
+                    formL.Form = f;
+                }
+
                 if (formL.HP != 0)
                     continue;
 
@@ -156,13 +163,13 @@ public sealed class PersonalTable8LA : IPersonalTable, IPersonalTable<PersonalIn
                         var formS = ResourcesUtil.SWSH.GetFormEntry(i, f);
 
                         Debug.Assert(formL.DexIndexNational == formS.DexIndexNational);
-                        formL.SetPersonalInfo(formS);
+                        formL.ImportPersonalInfo(formS);
                     }
                 }
                 else
                 {
                     // No form data was found, just write the base form data
-                    formL.SetPersonalInfo(l);
+                    formL.ImportPersonalInfo(l);
                 }
             }
         }
