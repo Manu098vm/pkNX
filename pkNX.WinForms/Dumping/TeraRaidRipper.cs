@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using pkNX.Containers;
 using pkNX.Structures;
 using pkNX.Structures.FlatBuffers;
@@ -56,6 +57,7 @@ public static class TeraRaidRipper
         var rateString = string.Join(Environment.NewLine, rateTotal.Select((z, i) => $"{i}\t{z.Scarlet}\t{z.Violet}"));
         File.WriteAllText(Path.Combine(outPath, rateFileName), rateString);
         WritePickle(outPath, all, pickleFileName);
+        DumpCommonText(ROM);
         // Raids can be shared, and show up with the same met location regardless of shared vs not.
         // No need to differentiate.
         // var scarlet = all.Where(z => z.Enemy.Info.RomVer != RaidRomType.TYPE_B);
@@ -171,15 +173,10 @@ public static class TeraRaidRipper
             priority += v130;
         }
 
-        var dataEncounters = GetDistributionContents(enemy, out int indexEncounters);
-        var dataDrop = GetDistributionContents(Path.Combine(path, reward), out int indexDrop);
-        var dataBonus = GetDistributionContents(Path.Combine(path, lottery), out int indexBonus);
-        var dataPriority = GetDistributionContents(Path.Combine(path, priority), out int indexPriority);
-
-        // BCAT Indexes can be reused by mixing and matching old files when reverting temporary distributions back to prior long-running distributions.
-        // They don't have to match, but just note if they do.
-        Debug.WriteLineIf(indexEncounters == indexDrop && indexDrop == indexBonus && indexBonus == indexPriority,
-            $"Info: BCAT indexes are inconsistent! enc:{indexEncounters} drop:{indexDrop} bonus:{indexBonus} priority:{indexPriority}");
+        var dataEncounters = GetDistributionContents(enemy);
+        var dataDrop = GetDistributionContents(Path.Combine(path, reward));
+        var dataBonus = GetDistributionContents(Path.Combine(path, lottery));
+        var dataPriority = GetDistributionContents(Path.Combine(path, priority));
 
         var tableEncounters = FlatBufferConverter.DeserializeFrom<DeliveryRaidEnemyTableArray>(dataEncounters);
         var tableDrops = FlatBufferConverter.DeserializeFrom<DeliveryRaidFixedRewardItemArray>(dataDrop);
@@ -380,15 +377,25 @@ public static class TeraRaidRipper
         File.WriteAllText(Path.Combine(dir, fileName), json);
     }
 
-    private static byte[] GetDistributionContents(string path, out int index)
+    private static byte[] GetDistributionContents(string path) => File.ReadAllBytes(path);
+
+    private static void DumpCommonText(IFileInternal ROM)
     {
-        index = 0; //  todo
-        return File.ReadAllBytes(path);
+        var lang = "English";
+        var cfg = new TextConfig(GameVersion.SV);
+        GetCommonText(ROM, "monsname", lang, cfg);
+        GetCommonText(ROM, "itemname", lang, cfg);
+        GetCommonText(ROM, "wazaname", lang, cfg);
+        GetCommonText(ROM, "typename", lang, cfg);
+        GetCommonText(ROM, "seikaku", lang, cfg);
     }
 
     private static string[] GetCommonText(IFileInternal ROM, string name, string lang, TextConfig cfg)
     {
         var data = ROM.GetPackedFile($"message/dat/{lang}/common/{name}.dat");
+        var path = $"{Path.Combine(Environment.CurrentDirectory, "SVResearches Dumps")}";
+        Directory.CreateDirectory(path);
+        File.WriteAllBytes($"{Path.Combine(path, $"{name}-{lang}.bin".ToLower())}", data);
         return new TextFile(data, cfg).Lines;
     }
 
