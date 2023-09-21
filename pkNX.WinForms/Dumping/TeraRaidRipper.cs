@@ -76,6 +76,7 @@ public static class TeraRaidRipper
                 enc.Enemy.Info.SerializePKHeX(bw, (byte)enc.Stars, enc.Rate, RaidSerializationFormat.BaseROM);
                 bw.Write(rmS);
                 bw.Write(rmV);
+                enc.Enemy.Info.SerializeTeraFinder(bw);
             }
         }
     }
@@ -322,6 +323,8 @@ public static class TeraRaidRipper
             enc.SerializeDistribution(bw);
         if (format == RaidSerializationFormat.Might)
             enc.SerializeMight(bw);
+
+        enc.SerializeTeraFinder(bw);
 
         var bin = ms.ToArray();
         if (!list.Any(z => z.SequenceEqual(bin)))

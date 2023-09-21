@@ -22,6 +22,14 @@ public partial class RaidEnemyInfo
         bw.Write(rate);
     }
 
+    public void SerializeTeraFinder(BinaryWriter bw)
+    {
+        bw.Write((uint)No);
+        bw.Write(DropTableFix);
+        bw.Write(DropTableRandom);
+        BossPokePara.SerializeTeraFinder(bw, BossDesc);
+    }
+
     public void SerializeDistribution(BinaryWriter bw)
     {
         var b = BossPokePara;
