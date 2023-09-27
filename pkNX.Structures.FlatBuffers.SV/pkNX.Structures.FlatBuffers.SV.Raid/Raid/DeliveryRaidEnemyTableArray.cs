@@ -27,7 +27,13 @@ public partial class RaidEnemyInfo
         bw.Write((uint)No);
         bw.Write(DropTableFix);
         bw.Write(DropTableRandom);
-        BossPokePara.SerializeTeraFinder(bw, BossDesc);
+        bw.Write((uint)BossPokePara.Item);
+        bw.Write((ushort)BossDesc.ExtraAction1.Wazano);
+        bw.Write((ushort)BossDesc.ExtraAction2.Wazano);
+        bw.Write((ushort)BossDesc.ExtraAction3.Wazano);
+        bw.Write((ushort)BossDesc.ExtraAction4.Wazano);
+        bw.Write((ushort)BossDesc.ExtraAction5.Wazano);
+        bw.Write((ushort)BossDesc.ExtraAction6.Wazano);
     }
 
     public void SerializeDistribution(BinaryWriter bw)
