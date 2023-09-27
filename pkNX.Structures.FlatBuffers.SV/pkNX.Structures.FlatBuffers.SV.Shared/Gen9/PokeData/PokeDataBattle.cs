@@ -47,6 +47,17 @@ public partial class PokeDataBattle
         bw.Write((byte)gem);
     }
 
+    public void SerializeTeraFinder(BinaryWriter bw, RaidBossData extra)
+    {
+        bw.Write((uint)Item);
+        bw.Write((ushort)extra.ExtraAction1.Wazano);
+        bw.Write((ushort)extra.ExtraAction2.Wazano);
+        bw.Write((ushort)extra.ExtraAction3.Wazano);
+        bw.Write((ushort)extra.ExtraAction4.Wazano);
+        bw.Write((ushort)extra.ExtraAction5.Wazano);
+        bw.Write((ushort)extra.ExtraAction6.Wazano);
+    }
+
     private void AssertRegularFormat()
     {
         if (TalentType != TalentType.V_NUM)

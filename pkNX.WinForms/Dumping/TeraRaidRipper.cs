@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using pkNX.Containers;
 using pkNX.Structures;
 using pkNX.Structures.FlatBuffers;
@@ -56,6 +57,7 @@ public static class TeraRaidRipper
         var rateString = string.Join(Environment.NewLine, rateTotal.Select((z, i) => $"{i}\t{z.Scarlet}\t{z.Violet}"));
         File.WriteAllText(Path.Combine(outPath, rateFileName), rateString);
         WritePickle(outPath, all, pickleFileName);
+        DumpCommonText(ROM);
         // Raids can be shared, and show up with the same met location regardless of shared vs not.
         // No need to differentiate.
         // var scarlet = all.Where(z => z.Enemy.Info.RomVer != RaidRomType.TYPE_B);
@@ -76,6 +78,7 @@ public static class TeraRaidRipper
                 enc.Enemy.Info.SerializePKHeX(bw, (byte)enc.Stars, enc.Rate, RaidSerializationFormat.BaseROM);
                 bw.Write(rmS);
                 bw.Write(rmV);
+                enc.Enemy.Info.SerializeTeraFinder(bw);
             }
         }
     }
@@ -170,15 +173,10 @@ public static class TeraRaidRipper
             priority += v130;
         }
 
-        var dataEncounters = GetDistributionContents(enemy, out int indexEncounters);
-        var dataDrop = GetDistributionContents(Path.Combine(path, reward), out int indexDrop);
-        var dataBonus = GetDistributionContents(Path.Combine(path, lottery), out int indexBonus);
-        var dataPriority = GetDistributionContents(Path.Combine(path, priority), out int indexPriority);
-
-        // BCAT Indexes can be reused by mixing and matching old files when reverting temporary distributions back to prior long-running distributions.
-        // They don't have to match, but just note if they do.
-        Debug.WriteLineIf(indexEncounters == indexDrop && indexDrop == indexBonus && indexBonus == indexPriority,
-            $"Info: BCAT indexes are inconsistent! enc:{indexEncounters} drop:{indexDrop} bonus:{indexBonus} priority:{indexPriority}");
+        var dataEncounters = GetDistributionContents(enemy);
+        var dataDrop = GetDistributionContents(Path.Combine(path, reward));
+        var dataBonus = GetDistributionContents(Path.Combine(path, lottery));
+        var dataPriority = GetDistributionContents(Path.Combine(path, priority));
 
         var tableEncounters = FlatBufferConverter.DeserializeFrom<DeliveryRaidEnemyTableArray>(dataEncounters);
         var tableDrops = FlatBufferConverter.DeserializeFrom<DeliveryRaidFixedRewardItemArray>(dataDrop);
@@ -323,6 +321,8 @@ public static class TeraRaidRipper
         if (format == RaidSerializationFormat.Might)
             enc.SerializeMight(bw);
 
+        enc.SerializeTeraFinder(bw);
+
         var bin = ms.ToArray();
         if (!list.Any(z => z.SequenceEqual(bin)))
             list.Add(bin);
@@ -377,15 +377,25 @@ public static class TeraRaidRipper
         File.WriteAllText(Path.Combine(dir, fileName), json);
     }
 
-    private static byte[] GetDistributionContents(string path, out int index)
+    private static byte[] GetDistributionContents(string path) => File.ReadAllBytes(path);
+
+    private static void DumpCommonText(IFileInternal ROM)
     {
-        index = 0; //  todo
-        return File.ReadAllBytes(path);
+        var lang = "English";
+        var cfg = new TextConfig(GameVersion.SV);
+        GetCommonText(ROM, "monsname", lang, cfg);
+        GetCommonText(ROM, "itemname", lang, cfg);
+        GetCommonText(ROM, "wazaname", lang, cfg);
+        GetCommonText(ROM, "typename", lang, cfg);
+        GetCommonText(ROM, "seikaku", lang, cfg);
     }
 
     private static string[] GetCommonText(IFileInternal ROM, string name, string lang, TextConfig cfg)
     {
         var data = ROM.GetPackedFile($"message/dat/{lang}/common/{name}.dat");
+        var path = $"{Path.Combine(Environment.CurrentDirectory, "SVResearches Dumps")}";
+        Directory.CreateDirectory(path);
+        File.WriteAllBytes($"{Path.Combine(path, $"{name}-{lang}.bin".ToLower())}", data);
         return new TextFile(data, cfg).Lines;
     }
 
@@ -590,24 +600,30 @@ public static class TeraRaidRipper
                 const int count = RaidLotteryRewardItem.RewardItemCount;
                 float totalRate = 0;
                 for (int i = 0; i < count; i++)
-                    totalRate += item.GetRewardItem(i).Rate;
+                {
+                    RaidLotteryRewardItemInfo? drop = item.GetRewardItem(i);
+                    totalRate += drop is null ? 0 : item.GetRewardItem(i).Rate;
+                }
 
                 for (int i = 0; i < count; i++)
                 {
                     if (nameBonus != item.TableName)
                         continue;
 
-                    var drop = item.GetRewardItem(i);
-                    float rate = (float)(Math.Round((item.GetRewardItem(i).Rate / totalRate) * 100f, 2));
+                    RaidLotteryRewardItemInfo? drop = item.GetRewardItem(i);
+                    float rate = (float)(Math.Round((drop is null ? 0 : drop.Rate / totalRate) * 100f, 2));
 
-                    if (drop.Category == RaidRewardItemCategoryType.POKE) // Material
-                        lines.Add($"\t\t\t{rate,5}% {drop.Num,2} × TM Material");
+                    if (drop is null)
+                        lines.Add($"\t\t\t{rate,5}% {drop?.Num,2} × Null");
 
-                    if (drop.Category == RaidRewardItemCategoryType.GEM) // Tera Shard
-                        lines.Add($"\t\t\t{rate,5}% {drop.Num,2} × Tera Shard");
+                    else if (drop?.Category == RaidRewardItemCategoryType.POKE) // Material
+                        lines.Add($"\t\t\t{rate,5}% {drop?.Num,2} × TM Material");
 
-                    if (drop.ItemID != 0)
-                        lines.Add($"\t\t\t{rate,5}% {drop.Num,2} × {GetItemName((ushort)drop.ItemID, items, moves)}");
+                    else if (drop?.Category == RaidRewardItemCategoryType.GEM) // Tera Shard
+                        lines.Add($"\t\t\t{rate,5}% {drop?.Num,2} × Tera Shard");
+
+                    else if (drop?.ItemID != 0)
+                        lines.Add($"\t\t\t{rate,5}% {drop?.Num,2} × {items[drop is null ? 0 : (ushort)drop.ItemID]}");
                 }
             }
 
