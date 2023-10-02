@@ -112,34 +112,44 @@ public class EncounterDumperSV
                         continue;
 
                     var appearAreas = new List<AppearTuple>();
-                    for (var x = areaNames.Count - 1; x >= 0; x--)
+
+                    if (!FindArea(AreaType.Cave))
+                        FindArea(AreaType.Default);
+
+                    bool FindArea(AreaType type)
                     {
-                        var areaName = areaNames[x];
-                        if (atlantis[areaName])
-                            continue;
-
-                        var areaInfo = areas[areaName];
-                        if (areaInfo.Tag is AreaTag.NG_Encount)
-                            continue;
-                        if (!scene.TryGetContainsCheck(fieldIndex, areaName, out var collider))
-                            continue;
-                        for (int p = 0; p < points.Count; p++)
+                        for (var x = areaNames.Count - 1; x >= 0; x--)
                         {
-                            var point = points[p];
-                            var pt = point.Position;
-                            if (!collider.ContainsPoint(pt.X, pt.Y, pt.Z))
+                            var areaName = areaNames[x];
+                            if (atlantis[areaName])
                                 continue;
-                            if (!TryGetPlaceName(ref areaName, areaInfo, pt, placeNameMap, areas, scene, fieldIndex, out var placeName))
-                                continue;
-                            areaName = areaNames[x];
-                            if (!appearAreas.Exists(z => z.Point == pt && z.AreaName == areaName))
-                                appearAreas.Add(new(placeName, areaName, areaInfo.AdjustEncLv, pt));
-                            points.RemoveAt(p);
-                            p--;
-                        }
 
-                        if (points.Count == 0)
-                            break;
+                            var areaInfo = areas[areaName];
+                            if (type != AreaType.Default && areaInfo.Type != type)
+                                continue;
+                            if (areaInfo.Tag is AreaTag.NG_Encount)
+                                continue;
+                            if (!scene.TryGetContainsCheck(fieldIndex, areaName, out var collider))
+                                continue;
+                            for (int p = 0; p < points.Count; p++)
+                            {
+                                var point = points[p];
+                                var pt = point.Position;
+                                if (!collider.ContainsPoint(pt.X, pt.Y, pt.Z))
+                                    continue;
+                                if (!TryGetPlaceName(ref areaName, areaInfo, pt, placeNameMap, areas, scene, fieldIndex, out var placeName))
+                                    continue;
+                                areaName = areaNames[x];
+                                if (!appearAreas.Exists(z => z.Point == pt && z.AreaName == areaName))
+                                    appearAreas.Add(new(placeName, areaName, areaInfo.AdjustEncLv, pt));
+                                points.RemoveAt(p);
+                                p--;
+                            }
+
+                            if (points.Count == 0)
+                                return true;
+                        }
+                        return false;
                     }
 
                     var locs = appearAreas.Select(a => placeNameMap[a.PlaceName].Index).Distinct().ToList();
@@ -490,7 +500,7 @@ public class EncounterDumperSV
         return true;
     }
 
-    private static bool TryGetPlaceName(ref string areaName, AreaInfo areaInfo,
+    public static bool TryGetPlaceName(ref string areaName, AreaInfo areaInfo,
         PackedVec3f point, Dictionary<string, (string Name, int Index)> placeNameMap,
         IReadOnlyDictionary<string, AreaInfo> areas,
         PaldeaSceneModel scene, PaldeaFieldIndex fieldIndex, out string placeName)
@@ -583,12 +593,15 @@ public class EncounterDumperSV
     private static bool IsCrossoverAllowed(LocationStorage storage)
     {
         var loc = storage.Location;
-        if (loc == 124) // Area Zero
-            return false;
-        if (loc == 8) // Mesagoza
-            return false;
-        return true;
+        return IsCrossoverAllowed(loc);
     }
+
+    public static bool IsCrossoverAllowed(int MetLocation) => MetLocation switch
+    {
+        8 => false, // Mesagoza
+        124 => false, // Area Zero
+        _ => true,
+    };
 
     private static bool GetIsStationary(PokemonActionID action) => action switch
     {
