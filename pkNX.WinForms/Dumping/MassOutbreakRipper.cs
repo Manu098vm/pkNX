@@ -8,35 +8,42 @@ using pkNX.Containers;
 using pkNX.Structures;
 using pkNX.Structures.FlatBuffers;
 using pkNX.Structures.FlatBuffers.SV;
-using Species = pkNX.Structures.Species;
+using static pkNX.Structures.Species;
 
 namespace pkNX.WinForms;
 
 public static class MassOutbreakRipper
 {
     private static readonly List<PickledOutbreak> Encounters = new();
+    private static Dictionary<string, (string Name, int Index)> NameDict = new();
 
-    public static void DumpDeliveryOutbreaks(IFileInternal ROM, string path)
+    public static void DumpDeliveryOutbreaks(IFileInternal ROM, string path, string dump)
     {
         Encounters.Clear();
+
+        var cfg = new TextConfig(Structures.GameVersion.SV);
+        var place_names = GetCommonText(ROM, "place_name", "English", cfg);
+        var data = ROM.GetPackedFile("message/dat/English/common/place_name.tbl");
+        var ahtb = new AHTB(data);
+        NameDict = EncounterDumperSV.GetPlaceNameMap(place_names, ahtb);
+
         var dirs = Directory.GetDirectories(path, "*", SearchOption.AllDirectories).OrderBy(z => z);
         foreach (var dir in dirs)
             DumpDeliveryOutbreakData(ROM, dir);
-        ExportPickle(Encounters, path);
+        ExportPickle(dump, Encounters);
     }
 
     private sealed record PickledOutbreak
     {
+        public required CachedOutbreak Parent { get; init; }
         public required ushort Species { get; init; }
         public required byte Form { get; init; }
         public byte Gender { get; init; } = 0xFF;
 
-        public required byte LevelMin { get; init; }
-        public required byte LevelMax { get; init; }
         public required RibbonIndex Ribbon { get; init; }
         public required byte MetBase { get; init; }
 
-        public required Dictionary<int, UInt128> MetPermit { get; init; }
+        public required Dictionary<LevelRange, UInt128> MetPermit { get; init; }
 
         public required bool ForceScaleRange { get; init; }
         public required byte ScaleMin { get; init; }
@@ -56,10 +63,10 @@ public static class MassOutbreakRipper
         if (!File.Exists(zoneF2)) // temporary workaround until DLC 2
             zoneF2 = zoneF1;
 
-        var dataZoneF0 = GetDistributionContents(zoneF0, out int indexZoneF0);
-        var dataZoneF1 = GetDistributionContents(Path.Combine(path, zoneF1), out int indexZoneF1);
-        var dataZoneF2 = GetDistributionContents(Path.Combine(path, zoneF2), out int indexZoneF2);
-        var dataPokeData = GetDistributionContents(Path.Combine(path, pokedata), out int indexPokeData);
+        var dataZoneF0 = GetDistributionContents(zoneF0);
+        var dataZoneF1 = GetDistributionContents(Path.Combine(path, zoneF1));
+        var dataZoneF2 = GetDistributionContents(Path.Combine(path, zoneF2));
+        var dataPokeData = GetDistributionContents(Path.Combine(path, pokedata));
 
         var tableZoneF0 = FlatBufferConverter.DeserializeFrom<DeliveryOutbreakArray>(dataZoneF0);
         var tableZoneF1 = FlatBufferConverter.DeserializeFrom<DeliveryOutbreakArray>(dataZoneF1);
@@ -67,35 +74,36 @@ public static class MassOutbreakRipper
         var tablePokeData = FlatBufferConverter.DeserializeFrom<DeliveryOutbreakPokeDataArray>(dataPokeData);
 
         var dirDistText = Path.Combine(path, "parse");
-        ExportParse(ROM, dirDistText, tableZoneF0, tableZoneF1, tableZoneF2, tablePokeData);
+        ExportParse(dirDistText, tableZoneF0, tableZoneF1, tableZoneF2, tablePokeData);
 
         AddToPickleJar(ROM, tableZoneF0, tableZoneF1, tableZoneF2, tablePokeData);
+        DumpPretty(ROM, dirDistText);
     }
 
-    private static void ExportPickle(List<PickledOutbreak> encounters, string path)
+    private static void ExportPickle(string dump, IEnumerable<PickledOutbreak> encounters)
     {
-        var dest = Path.Combine(path, "encounters", "outbreak_sv.pkl");
+        var dest = Path.Combine(dump, "encounter_outbreak_paldea.pkl");
         using var fs = File.Create(dest);
         using var bw = new BinaryWriter(fs);
         foreach (var enc in encounters.DistinctBy(x => x))
         {
-            foreach (var kvp in enc.MetPermit)
-            {
-                var boost = kvp.Key;
-                var permit = kvp.Value;
-                WriteEncounter(enc, bw, boost, permit);
-            }
+            var ordered = enc.MetPermit
+                .OrderBy(z => z.Key.Min)
+                .ThenBy(z => z.Key.Max);
+
+            foreach (var (range, permit) in ordered)
+                WriteEncounter(enc, bw, range, permit);
         }
     }
 
-    private static void WriteEncounter(PickledOutbreak enc, BinaryWriter bw, int boost, UInt128 permit)
+    private static void WriteEncounter(PickledOutbreak enc, BinaryWriter bw, LevelRange range, UInt128 permit)
     {
         bw.Write(enc.Species);
         bw.Write(enc.Form);
         bw.Write(enc.Gender);
 
-        bw.Write(Clamp(enc.LevelMin, boost));
-        bw.Write(Clamp(enc.LevelMax, boost));
+        bw.Write(range.Min);
+        bw.Write(range.Max);
         bw.Write((byte)enc.Ribbon);
         bw.Write(enc.MetBase);
 
@@ -108,8 +116,9 @@ public static class MassOutbreakRipper
         bw.Write((ulong)(permit >> 64));
 
         return;
-        static byte Clamp(byte val, int b) => (byte)Math.Clamp(val + b, 1, 100);
     }
+
+    private static byte ClampAddBoost(byte val, int b) => (byte)Math.Clamp(val + b, 1, 100);
 
     private static void AddToPickleJar(IFileInternal ROM, DeliveryOutbreakArray f0, DeliveryOutbreakArray f1, DeliveryOutbreakArray f2, DeliveryOutbreakPokeDataArray pd)
     {
@@ -124,16 +133,10 @@ public static class MassOutbreakRipper
         var field = new PaldeaFieldModel(ROM);
         var scene = new PaldeaSceneModel(ROM, field);
 
-        var cfg = new TextConfig(Structures.GameVersion.SV);
-        var place_names = GetCommonText(ROM, "place_name", "English", cfg);
-        var data = ROM.GetPackedFile("message/dat/English/common/place_name.tbl");
-        var ahtb = new AHTB(data);
-        var nameDict = EncounterDumperSV.GetPlaceNameMap(place_names, ahtb);
-
         ScanAssertions(pd);
-        AddForMap(pointsF0, f0, pd, scene, nameDict, PaldeaFieldIndex.Paldea, 6);
-        AddForMap(pointsF1, f1, pd, scene, nameDict, PaldeaFieldIndex.Kitakami, 132);
-      //AddForMap(pointsF2, f2, pd, scene, nameDict, PaldeaFieldIndex.Blueberry, 170);
+        AddForMap(pointsF0, f0, pd, scene, NameDict, PaldeaFieldIndex.Paldea, 6);
+        AddForMap(pointsF1, f1, pd, scene, NameDict, PaldeaFieldIndex.Kitakami, 132);
+      //AddForMap(pointsF2, f2, pd, scene, NameDict, PaldeaFieldIndex.Blueberry, 170);
     }
 
     private static void ScanAssertions(params DeliveryOutbreakPokeDataArray[] obs)
@@ -165,11 +168,20 @@ public static class MassOutbreakRipper
 
         var areas = scene.AreaInfos[(int)fieldIndex];
         var areaNames = scene.AreaNames[(int)fieldIndex];
+        var atlantis = scene.IsAtlantis[(int)fieldIndex];
+        if (fieldIndex == PaldeaFieldIndex.Kitakami)
+        {
+            areas = areas.Where(z => z.Value.AdjustEncLv != 0)
+                .ToDictionary(z => z.Key, z => z.Value);
+            areaNames = areas.Keys.ToList();
+        }
         foreach (var point in points)
         {
             foreach (var enc in encs)
             {
                 var poke = enc.Poke;
+                if (!poke.IsLevelRangeCompatible(point.LevelRange))
+                    continue;
                 if (!poke.IsEnableCompatible(point.EnableTable))
                     continue;
                 if (!poke.IsCompatibleArea((byte)point.AreaNo))
@@ -177,29 +189,81 @@ public static class MassOutbreakRipper
                 if (!poke.IsCompatibleArea(point.AreaName))
                     continue;
 
+                var min = Math.Max((byte)poke.MinLevel, (byte)point.LevelRange.X);
+                var max = Math.Min((byte)poke.MaxLevel, (byte)point.LevelRange.Y);
                 // Cool, can spawn at this point.
                 // Find all met location IDs we can wander to, then bitflag them into the enc field.
-                var metData = GetMetFlags(scene, placeNameMap, fieldIndex, baseMet, areaNames, areas, point);
-                enc.BoostMetFlags.TryGetValue(metData.Boost, out var val);
-                enc.BoostMetFlags[metData.Boost] = val | metData.Met;
+                var metData = GetMetFlags(scene, placeNameMap, fieldIndex, baseMet, areaNames, areas, point, atlantis);
+                var tuple = new LevelRange(min, max);
+                enc.MetInfo.TryGetValue(tuple, out var val);
+                enc.MetInfo[tuple] = val | metData.Met;
+                if (metData.Boost != 0)
+                {
+                    tuple = new LevelRange(ClampAddBoost(tuple.Min, metData.Boost), ClampAddBoost(tuple.Max, metData.Boost));
+                    enc.MetInfo.TryGetValue(tuple, out val);
+                    enc.MetInfo[tuple] = val | metData.Met;
+                }
             }
+        }
+
+        ConsolidateMetInfo(encs);
+
+        foreach (var e in encs)
+        {
+            if (e.MetInfo.Count == 0)
+                throw new Exception("No met flags found for encounter!");
         }
 
         AddToJar(encs);
     }
 
-    private static void AddToJar(CachedOutbreak[] encs)
+    private static void ConsolidateMetInfo(IEnumerable<CachedOutbreak> encs)
+    {
+        foreach (var e in encs)
+        {
+            var ranges = e.MetInfo.ToList();
+            // If the level ranges overlap for any key value pair with the same flags, consolidate them.
+            // For each entry, if a later entry has the same flags, and the level ranges overlap, delete the later entry after merging the level ranges into the first entry.
+            for (int i = 0; i < ranges.Count; i++)
+            {
+                var ((min, max), met) = ranges[i];
+                for (int j = i + 1; j < ranges.Count; j++)
+                {
+                    var (min2, max2) = ranges[j].Key;
+                    var met2 = ranges[j].Value;
+                    if (met != met2)
+                        continue;
+                    if (min2 > max || max2 < min)
+                        continue;
+                    // Overlap, merge.
+                    min = Math.Min(min, min2);
+                    max = Math.Max(max, max2);
+                    ranges.RemoveAt(j);
+                    j--;
+                }
+                ranges[i] = new(new(min, max), met);
+            }
+            e.MetInfo.Clear();
+            foreach (var r in ranges)
+                e.MetInfo[r.Key] = r.Value;
+        }
+    }
+
+    private record struct LevelRange(byte Min, byte Max);
+
+    private static void AddToJar(IEnumerable<CachedOutbreak> encs)
     {
         foreach (var enc in encs)
         {
             var pk = enc.Poke;
             ushort species = SpeciesConverterSV.GetNational9((ushort)pk.DevId);
             byte form = (byte)pk.FormId;
-            if (species is (int)Species.Scatterbug or (int)Species.Spewpa or (int)Species.Vivillon)
+            if (species is (int)Scatterbug or (int)Spewpa or (int)Vivillon)
                 form = 30;
 
             var pickled = new PickledOutbreak
             {
+                Parent = enc,
                 Species = species,
                 Form = form,
                 Gender = pk.Sex switch
@@ -209,23 +273,21 @@ public static class MassOutbreakRipper
                     SexType.FEMALE => 1,
                     _ => throw new ArgumentOutOfRangeException(nameof(SexType), pk.Sex, "Unknown Gender"),
                 },
-                LevelMin = (byte)pk.MinLevel,
-                LevelMax = (byte)pk.MaxLevel,
-                Ribbon = pk.AddRibbonPercentage == 0 ? unchecked((RibbonIndex)(-1)) : (RibbonIndex)pk.AddRibbonType,
+                Ribbon = unchecked((RibbonIndex)(pk.AddRibbonPercentage == 0 ? -1 : (int)pk.AddRibbonType - 1)),
 
                 ForceScaleRange = pk.EnableScaleRange,
                 ScaleMin = (byte)pk.MinScale,
                 ScaleMax = (byte)pk.MaxScale,
                 IsShiny = pk.RarePercentage >= 100,
                 MetBase = enc.MetBase,
-                MetPermit = enc.BoostMetFlags,
+                MetPermit = enc.MetInfo,
             };
             Encounters.Add(pickled);
         }
     }
 
-    private static (UInt128 Met, int Boost)  GetMetFlags(PaldeaSceneModel scene, Dictionary<string, (string Name, int Index)> placeNameMap, PaldeaFieldIndex fieldIndex,
-        byte baseMet, List<string> areaNames, Dictionary<string, AreaInfo> areas, OutbreakPointData point)
+    private static (UInt128 Met, int Boost) GetMetFlags(PaldeaSceneModel scene, Dictionary<string, (string Name, int Index)> placeNameMap, PaldeaFieldIndex fieldIndex,
+        byte baseMet, List<string> areaNames, Dictionary<string, AreaInfo> areas, OutbreakPointData point, Dictionary<string, bool> atlantis)
     {
         UInt128 result = 0;
         int boost = 0;
@@ -233,6 +295,9 @@ public static class MassOutbreakRipper
         {
             var areaName = areaNames[i];
             var areaInfo = areas[areaName];
+            if (atlantis[areaName])
+                continue;
+
             if (areaInfo.Tag is AreaTag.NG_Encount)
                 continue;
             if (!scene.TryGetContainsCheck(fieldIndex, areaName, out var collider))
@@ -280,7 +345,7 @@ public static class MassOutbreakRipper
         public required DeliveryOutbreakPokeData Poke { get; init; }
 
         public byte MetBase { get; set; }
-        public readonly Dictionary<int, UInt128> BoostMetFlags = new();
+        public readonly Dictionary<LevelRange, UInt128> MetInfo = new();
     }
 
     private static CachedOutbreak[] GetMetaEncounter(IEnumerable<DeliveryOutbreak> possibleTable, DeliveryOutbreakPokeDataArray pd)
@@ -306,26 +371,22 @@ public static class MassOutbreakRipper
         return ret.ToArray();
     }
 
-    private static byte[] GetDistributionContents(string path, out int index)
-    {
-        index = 0; //  todo
-        return File.ReadAllBytes(path);
-    }
+    private static byte[] GetDistributionContents(string path) => File.ReadAllBytes(path);
 
-    private static string Humanize(OutbreakEnableTable enable)
+    private static string Humanize(EnableTable enable)
     {
         var sb = new StringBuilder();
         if (enable.Air1) sb.Append(" Air1");
         if (enable.Air2) sb.Append(" Air2");
         if (enable.Land) sb.Append(" Land");
         if (enable.UpWater) sb.Append(" UpWater");
-        if (enable.UnderWater) sb.Append(" Underwater");
+        if (enable.Underwater) sb.Append(" Underwater");
         if (sb.Length == 0)
             return "Enable: Unrestricted";
         return "Enable:" + sb;
     }
 
-    private static string Humanize(VersionTable ver) => ver switch
+    private static string Humanize(VersionTable? ver) => ver switch
     {
         { A: true, B: true } => "Version: Both",
         { A: true } => "Version: Scarlet",
@@ -333,17 +394,17 @@ public static class MassOutbreakRipper
         _ => "Version: None",
     };
 
-    private static void ExportParse(IFileInternal ROM, string dir, DeliveryOutbreakArray tableZoneF0, DeliveryOutbreakArray tableZoneF1, DeliveryOutbreakArray tableZoneF2, DeliveryOutbreakPokeDataArray tablePokeData)
+    private static void ExportParse(string dir, DeliveryOutbreakArray tableZoneF0, DeliveryOutbreakArray tableZoneF1, DeliveryOutbreakArray tableZoneF2, DeliveryOutbreakPokeDataArray tablePokeData)
     {
         var dumpZ0 = TableUtil.GetTable(tableZoneF0.Table);
         var dumpZ1 = TableUtil.GetTable(tableZoneF1.Table);
-        var dumpZ2 = TableUtil.GetTable(tableZoneF2.Table);
+      //var dumpZ2 = TableUtil.GetTable(tableZoneF2.Table);
         var dumpPD = TableUtil.GetTable(tablePokeData.Table);
         var dump = new[]
         {
             ("zone_main", dumpZ0),
             ("zone_su1", dumpZ1),
-            ("zone_su2", dumpZ2),
+          //("zone_su2", dumpZ2),
             ("pokedata", dumpPD),
         };
 
@@ -356,9 +417,8 @@ public static class MassOutbreakRipper
 
         DumpJson(tableZoneF0, dir, "zone_main");
         DumpJson(tableZoneF1, dir, "zone_su1");
-        DumpJson(tableZoneF2, dir, "zone_su2");
+      //DumpJson(tableZoneF2, dir, "zone_su2");
         DumpJson(tablePokeData, dir, "pokedata");
-        DumpPretty(ROM, tableZoneF0, tableZoneF1, tableZoneF2, tablePokeData, dir); // todo
     }
 
     private static void DumpJson(object flat, string dir, string name)
@@ -376,8 +436,65 @@ public static class MassOutbreakRipper
         return new TextFile(data, cfg).Lines;
     }
 
-    private static void DumpPretty(IFileInternal ROM, DeliveryOutbreakArray tableZoneF0, DeliveryOutbreakArray tableZoneF1, DeliveryOutbreakArray tableZoneF2, DeliveryOutbreakPokeDataArray tablePokeData, string dir)
+    private static void DumpPretty(IFileInternal ROM, string dir)
     {
-        // todo
+        string fileName = $"pretty_{Encounters[0].Parent.Poke.ID}.txt";
+        using var sw = File.CreateText(Path.Combine(dir, fileName));
+
+        foreach (var enc in Encounters)
+        {
+            var parent = enc.Parent;
+            WriteParent(ROM, sw, parent);
+            WriteLocationList(sw, parent.MetInfo, parent.MetBase);
+            sw.WriteLine();
+        }
+    }
+
+    private static void WriteLocationList(TextWriter sw, Dictionary<LevelRange, UInt128> metFlags, byte baseMet)
+    {
+        foreach ((var range, UInt128 flags) in metFlags.OrderBy(z => z.Key.Min).ThenBy(z => z.Key.Max))
+        {
+            for (int i = 0; i < 128; i++)
+            {
+                if (((flags >> i) & 1) != 1)
+                    continue;
+
+                var met = baseMet + i;
+                var location = NameDict.First(z => z.Value.Index == met);
+                sw.WriteLine($"\tLv. {range.Min}-{range.Max} @ {location}");
+            }
+        }
+    }
+
+    private static void WriteParent(IFileInternal ROM, StreamWriter sw, CachedOutbreak parent)
+    {
+        const string lang = "English";
+        var cfg = new TextConfig(Structures.GameVersion.SV);
+        var enc = parent.Poke;
+
+        var species = GetCommonText(ROM, "monsname", lang, cfg);
+        var ribbons = GetCommonText(ROM, "ribbon", lang, cfg);
+
+        var formName = TeraRaidRipper.GetFormName(ROM, (ushort)enc.DevId, (byte)enc.FormId);
+        var form = formName switch
+        {
+            not "" when enc.FormId is 0 => $" ({formName})",
+            not "" => $"-{enc.FormId} ({formName})",
+            _ => string.Empty,
+        };
+        var shiny = enc.EnableRarePercentage ? $"{enc.RarePercentage}%" : "Standard";
+
+        sw.WriteLine($"ID: {enc.ID}");
+        sw.WriteLine($"{species[(int)enc.DevId]}{form}");
+        sw.WriteLine(Humanize(enc.Enable!.Value));
+        sw.WriteLine(Humanize(enc.Version));
+        sw.WriteLine($"Base Level Range: {enc.MinLevel}-{enc.MaxLevel}");
+        if (enc.Sex is not SexType.DEFAULT)
+            sw.WriteLine($"Gender: {enc.Sex}");
+        if (enc.EnableScaleRange)
+            sw.WriteLine($"Scale: {enc.MinScale}-{enc.MaxScale}");
+        sw.WriteLine($"Shiny Rate: {shiny}");
+        if (enc.AddRibbonPercentage != 0)
+            sw.WriteLine($"Ribbon/Mark: {ribbons[(int)enc.AddRibbonType - 1]} ({enc.AddRibbonPercentage}%)");
     }
 }

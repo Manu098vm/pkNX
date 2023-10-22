@@ -1,7 +1,6 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -58,7 +57,6 @@ public static class TeraRaidRipper
         var rateString = string.Join(Environment.NewLine, rateTotal.Select((z, i) => $"{i}\t{z.Scarlet}\t{z.Violet}"));
         File.WriteAllText(Path.Combine(outPath, rateFileName), rateString);
         WritePickle(outPath, all, pickleFileName);
-        DumpCommonText(ROM);
         // Raids can be shared, and show up with the same met location regardless of shared vs not.
         // No need to differentiate.
         // var scarlet = all.Where(z => z.Enemy.Info.RomVer != RaidRomType.TYPE_B);
@@ -165,7 +163,6 @@ public static class TeraRaidRipper
             lottery += v200;
             priority += v200;
         }
-
         else if (File.Exists(enemy + v130))
         {
             enemy += v130;
@@ -177,7 +174,7 @@ public static class TeraRaidRipper
         var dataEncounters = GetDistributionContents(enemy);
         var dataDrop = GetDistributionContents(Path.Combine(path, reward));
         var dataBonus = GetDistributionContents(Path.Combine(path, lottery));
-        var dataPriority = GetDistributionContents(Path.Combine(path, priority));
+      //var dataPriority = GetDistributionContents(Path.Combine(path, priority));
 
         var tableEncounters = FlatBufferConverter.DeserializeFrom<DeliveryRaidEnemyTableArray>(dataEncounters);
         var tableDrops = FlatBufferConverter.DeserializeFrom<DeliveryRaidFixedRewardItemArray>(dataDrop);
@@ -380,17 +377,6 @@ public static class TeraRaidRipper
 
     private static byte[] GetDistributionContents(string path) => File.ReadAllBytes(path);
 
-    private static void DumpCommonText(IFileInternal ROM)
-    {
-        var lang = "English";
-        var cfg = new TextConfig(GameVersion.SV);
-        GetCommonText(ROM, "monsname", lang, cfg);
-        GetCommonText(ROM, "itemname", lang, cfg);
-        GetCommonText(ROM, "wazaname", lang, cfg);
-        GetCommonText(ROM, "typename", lang, cfg);
-        GetCommonText(ROM, "seikaku", lang, cfg);
-    }
-
     private static string[] GetCommonText(IFileInternal ROM, string name, string lang, TextConfig cfg)
     {
         var data = ROM.GetPackedFile($"message/dat/{lang}/common/{name}.dat");
@@ -453,14 +439,14 @@ public static class TeraRaidRipper
                 TokuseiType.SET_2 => $"{abilities[pi.Ability2]} (2)",
                 TokuseiType.SET_3 => $"{abilities[pi.AbilityH]} (H)",
                 TokuseiType.RANDOM_12 => "Any (1/2)",
-                _ => "Any (1/2/H)",
+                _ => "Any (1/2/H)", // RANDOM_123
             };
 
             var shiny = boss.RareType switch
             {
                 RareType.RARE => "Always",
                 RareType.NO_RARE => "Never",
-                _ => string.Empty,
+                _ => string.Empty, // Random
             };
 
             var talent = boss.TalentValue;
@@ -494,13 +480,14 @@ public static class TeraRaidRipper
             {
                 SexType.MALE => "Male",
                 SexType.FEMALE => "Female",
-                _ => string.Empty,
+                _ => string.Empty, // Default
             };
 
-            var form = GetFormName(ROM, (ushort)boss.DevId, (byte)boss.FormId) switch
+            var formName = GetFormName(ROM, (ushort)boss.DevId, (byte)boss.FormId);
+            var form = formName switch
             {
-                not "" when boss.FormId is 0 => $" ({GetFormName(ROM, (ushort)boss.DevId, (byte)boss.FormId)})",
-                not "" => $"-{boss.FormId} ({GetFormName(ROM, (ushort)boss.DevId, (byte)boss.FormId)})",
+                not "" when boss.FormId is 0 => $" ({formName})",
+                not "" => $"-{boss.FormId} ({formName})",
                 _ => string.Empty,
             };
 
@@ -542,11 +529,8 @@ public static class TeraRaidRipper
             if (boss.ScaleType != SizeType.RANDOM)
                 lines.Add($"\tScale: {size}");
 
-            if (entry.Info.Difficulty == 7)
-            {
-                float hp = entry.Info.BossDesc.HpCoef / 100f;
-                lines.Add($"\tHP Multiplier: {hp:0.0}x");
-            }
+            float hp = entry.Info.BossDesc.HpCoef / 100f;
+            lines.Add($"\tHP Multiplier: {hp:0.0}x");
 
             if (boss.Item != ItemID.ITEMID_NONE)
                 lines.Add($"\tHeld Item: {items[(int)boss.Item]}");
@@ -560,21 +544,22 @@ public static class TeraRaidRipper
             if ((int)boss.Waza3.WazaId != 0) lines.Add($"\t\t\t- {moves[(int)boss.Waza3.WazaId]}");
             if ((int)boss.Waza4.WazaId != 0) lines.Add($"\t\t\t- {moves[(int)boss.Waza4.WazaId]}");
 
-            lines.Add($"\t\tExtra Moves:");
-
-            if ((int)extra.ExtraAction1.Wazano == 0 && (int)extra.ExtraAction2.Wazano == 0 && (int)extra.ExtraAction3.Wazano == 0 && (int)extra.ExtraAction4.Wazano == 0 && (int)extra.ExtraAction5.Wazano == 0 && (int)extra.ExtraAction6.Wazano == 0)
+            if (extra.PowerChargeTrigerHp != 0 && extra.PowerChargeTrigerTime != 0)
             {
-                lines.Add("\t\t\tNone!");
+                lines.Add($"\t\tShield Activation:");
+                lines.Add($"\t\t\t- {extra.PowerChargeTrigerHp}% HP Remaining");
+                lines.Add($"\t\t\t- {extra.PowerChargeTrigerTime}% Time Remaining");
             }
 
-            else
+            if ((int)extra.ExtraAction1.Action != 0 || (int)extra.ExtraAction2.Action != 0 || (int)extra.ExtraAction3.Action != 0 || (int)extra.ExtraAction4.Action != 0 || (int)extra.ExtraAction5.Action != 0 || (int)extra.ExtraAction6.Action != 0)
             {
-                if ((int)extra.ExtraAction1.Wazano != 0) lines.Add($"\t\t\t- {moves[(int)extra.ExtraAction1.Wazano]}");
-                if ((int)extra.ExtraAction2.Wazano != 0) lines.Add($"\t\t\t- {moves[(int)extra.ExtraAction2.Wazano]}");
-                if ((int)extra.ExtraAction3.Wazano != 0) lines.Add($"\t\t\t- {moves[(int)extra.ExtraAction3.Wazano]}");
-                if ((int)extra.ExtraAction4.Wazano != 0) lines.Add($"\t\t\t- {moves[(int)extra.ExtraAction4.Wazano]}");
-                if ((int)extra.ExtraAction5.Wazano != 0) lines.Add($"\t\t\t- {moves[(int)extra.ExtraAction5.Wazano]}");
-                if ((int)extra.ExtraAction6.Wazano != 0) lines.Add($"\t\t\t- {moves[(int)extra.ExtraAction6.Wazano]}");
+                lines.Add("\t\tExtra Actions:");
+                if ((int)extra.ExtraAction1.Action != 0) lines.Add($"\t\t\t- {GetExtraActionInfo(extra.ExtraAction1, moves)}");
+                if ((int)extra.ExtraAction2.Action != 0) lines.Add($"\t\t\t- {GetExtraActionInfo(extra.ExtraAction2, moves)}");
+                if ((int)extra.ExtraAction3.Action != 0) lines.Add($"\t\t\t- {GetExtraActionInfo(extra.ExtraAction3, moves)}");
+                if ((int)extra.ExtraAction4.Action != 0) lines.Add($"\t\t\t- {GetExtraActionInfo(extra.ExtraAction4, moves)}");
+                if ((int)extra.ExtraAction5.Action != 0) lines.Add($"\t\t\t- {GetExtraActionInfo(extra.ExtraAction5, moves)}");
+                if ((int)extra.ExtraAction6.Action != 0) lines.Add($"\t\t\t- {GetExtraActionInfo(extra.ExtraAction6, moves)}");
             }
 
             lines.Add("\t\tItem Drops:");
@@ -597,10 +582,10 @@ public static class TeraRaidRipper
                     };
 
                     if (drop.Category == RaidRewardItemCategoryType.POKE) // Material
-                        lines.Add($"\t\t\t{drop.Num,2} × TM Material{limitation}");
+                        lines.Add($"\t\t\t{drop.Num,2} × {GetNameMaterial(ROM, boss.DevId, items)}{limitation}");
 
                     if (drop.Category == RaidRewardItemCategoryType.GEM) // Tera Shard
-                        lines.Add($"\t\t\t{drop.Num,2} × Tera Shard{limitation}");
+                        lines.Add($"\t\t\t{drop.Num,2} × {GetNameShard(boss.GemType, types)}{limitation}");
 
                     if (drop.ItemID != 0)
                         lines.Add($"\t\t\t{drop.Num,2} × {GetItemName((ushort)drop.ItemID, items, moves)}{limitation}");
@@ -630,11 +615,11 @@ public static class TeraRaidRipper
                     if (drop is null)
                         lines.Add($"\t\t\t{rate,5}% {drop?.Num,2} × Null");
 
-                    else if (drop?.Category == RaidRewardItemCategoryType.POKE) // Material
-                        lines.Add($"\t\t\t{rate,5}% {drop?.Num,2} × TM Material");
+                    if (drop.Category == RaidRewardItemCategoryType.POKE) // Material
+                        lines.Add($"\t\t\t{rate,5}% {drop.Num,2} × {GetNameMaterial(ROM, boss.DevId, items)}");
 
-                    else if (drop?.Category == RaidRewardItemCategoryType.GEM) // Tera Shard
-                        lines.Add($"\t\t\t{rate,5}% {drop?.Num,2} × Tera Shard");
+                    if (drop.Category == RaidRewardItemCategoryType.GEM) // Tera Shard
+                        lines.Add($"\t\t\t{rate,5}% {drop.Num,2} × {GetNameShard(boss.GemType, types)}");
 
                     else if (drop?.ItemID != 0)
                         lines.Add($"\t\t\t{rate,5}% {drop?.Num,2} × {items[drop is null ? 0 : (ushort)drop.ItemID]}");
@@ -647,44 +632,48 @@ public static class TeraRaidRipper
         File.WriteAllLines(Path.Combine(dir, $"pretty_{ident}.txt"), lines);
     }
 
-    private static string GetFormName(IFileInternal ROM, ushort species, byte form)
+    public static string GetFormName(IFileInternal ROM, ushort species, byte form)
     {
         const string lang = "English";
         var cfg = new TextConfig(GameVersion.SV);
-        var ahtb = GetCommonAHTB(ROM, "zkn_form", lang);
         var text = GetCommonText(ROM, "zkn_form", lang, cfg);
         var type = GetCommonText(ROM, "typename", lang, cfg);
+        var path = ROM.GetPackedFile("message/dat/English/common/zkn_form.tbl");
+        var ahtb = new AHTB(path);
 
-        var GenericFormNames = new HashSet<Species>() { Tauros, Unown, Kyogre, Groudon, Rotom, Arceus, Kyurem, Greninja, Rockruff };
-        string[] TaurosForms = new[] { "", "Combat Breed", "Blaze Breed", "Aqua Breed" };
-        char[] UnownForms = "ABCDEFGHIJKLMNOPQRSTUVWXYZ!?".ToCharArray();
+        var GenericFormNames = new HashSet<Species> { Tauros, Unown, Kyogre, Groudon, Rotom, Arceus, Kyurem, Greninja, Rockruff, Minior };
+        string[] TaurosForms = { "", "Combat Breed", "Blaze Breed", "Aqua Breed" };
+        ReadOnlySpan<char> UnownForms = "ABCDEFGHIJKLMNOPQRSTUVWXYZ!?";
+        string[] MiniorForms = { "Red", "Orange", "Yellow", "Green", "Blue", "Indigo", "Violet" };
+
+        // some species have form strings that are just the species name (Rotom), or are not descriptive (e.g. Unown "One form"), or no form string at all!
+        if (GenericFormNames.Contains((Species)species))
+        {
+            return (Species)species switch
+            {
+                Tauros when form is not 0 => $"Paldean Form / {TaurosForms[form]}",
+                Unown => $"Unown {UnownForms[form]}", // A-Z!?
+                Kyogre or Groudon when form is 0 => "", // Kyogre-0 / Groudon-0
+                Rotom when form is 0 => "", // Rotom-0
+                Arceus => $"Type: {type[form]}", // Types
+                Kyurem when form is 0 => "", // Kyurem-0
+                Greninja when form is 1 => "", // Battle Bond Greninja
+                Rockruff when form is 1 => "", // Own Tempo Rockruff
+                Minior when form is <= 6 => $"{MiniorForms[form]} Meteor Form", // Meteor Forms
+                _ => "",
+            };
+        }
+
         for (int i = 0; i < text.Length; i++)
         {
             var entry = ahtb.Entries[i];
             var name = entry.Name;
             var line = text[i];
 
-            // some species have form strings that are just the species name (Rotom), or are not descriptive (e.g. Unown "One form"), or no form string at all!
-            if (GenericFormNames.Contains((Species)species))
-            {
-                return (Species)species switch
-                {
-                    Tauros when form is not 0 => $"Paldean Form / {TaurosForms[form]}",
-                    Unown => $"Unown {UnownForms[form]}", // A-Z!?
-                    Kyogre or Groudon when form is 0 => "", // Kyogre-0 / Groudon-0
-                    Rotom when form is 0 => "", // Rotom-0
-                    Arceus => $"{type[form]}", // Types
-                    Kyurem when form is 0 => "", // Kyurem-0
-                    Greninja when form is 1 => "", // Battle Bond Greninja
-                    Rockruff when form is 1 => "", // Own Tempo Rockruff
-                    _ => "",
-                };
-            }
-
-            else if (name == $"ZKN_FORM_{species:000}_{form:000}")
-            {
+            if (species is (int)Scatterbug or (int)Spewpa) // workaround to get Vivillon form strings
+                species = (int)Vivillon;
+            if (name == $"ZKN_FORM_{species:000}_{form:000}")
                 return line;
-            }
         }
 
         return "";
@@ -716,4 +705,37 @@ public static class TeraRaidRipper
         690 or 691 or 692 or 693 => $"{items[item]} {moves[tm[096 + item - 690]]}", // TM096 to TM099
         _ => $"{items[item]} {moves[tm[100 + item - 2160]]}", // TM100 to TM229
     };
+
+    private static string GetNameMaterial(IFileInternal ROM, DevID species, ReadOnlySpan<string> items)
+    {
+        var data = ROM.GetPackedFile("world/data/item/dropitemdata/dropitemdata_array.bin");
+        var obj = FlatBufferConverter.DeserializeFrom<DropItemDataArray>(data);
+        foreach (var t in obj.Table)
+        {
+            var item = t.Item1.ItemId;
+            if (t.DevId == species && item != 0)
+                return $"{items[(int)t.Item1.ItemId]}";
+        }
+
+        return "TM Material"; // no material, but the raid data may have it in the drop table anyway
+    }
+
+    private static string GetNameShard(GemType gem, ReadOnlySpan<string> types) => gem switch
+    {
+        GemType.DEFAULT or GemType.RANDOM => "Tera Shard", // variable, matches boss gemtype
+        _ => $"{types[(int)gem - 2]} Tera Shard",
+    };
+
+    private static string GetExtraActionInfo(RaidBossExtraData action, string[] moves)
+    {
+        var type = action.Timing == RaidBossExtraTimingType.TIME ? "Time" : "HP";
+        return action.Action switch
+        {
+            RaidBossExtraActType.BOSS_STATUS_RESET => $"Reset Raid Boss' Stat Changes at {action.Value}% {type} Remaining",
+            RaidBossExtraActType.PLAYER_STATUS_RESET => $"Reset Player's Stat Changes at {action.Value}% {type} Remaining",
+            RaidBossExtraActType.WAZA => $"Use {moves[(int)action.Wazano]} at {action.Value}% {type} Remaining",
+            RaidBossExtraActType.GEM_COUNT => $"Reduce Tera Orb Charge at {action.Value}% {type} Remaining",
+            _ => "",
+        };
+    }
 }
