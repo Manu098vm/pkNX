@@ -11,11 +11,11 @@ namespace pkNX.Structures.FlatBuffers;
 
 public class PaldeaSceneModel
 {
-    public List<string>[] AreaNames { get; } = { new(), new() };
-    public Dictionary<string, AreaInfo>[] AreaInfos { get; } = { new(), new() };
-    public Dictionary<string, HavokCollision.AABBTree>[] AreaCollisionTrees { get; } = { new(), new() };
-    public Dictionary<string, BoxCollision9>[] AreaCollisionBoxes { get; } = { new(), new() };
-    public Dictionary<string, bool>[] IsAtlantis { get; } = { new(), new() };
+    public List<string>[] AreaNames { get; } = { new(), new() , new() };
+    public Dictionary<string, AreaInfo>[] AreaInfos { get; } = { new(), new(), new() };
+    public Dictionary<string, HavokCollision.AABBTree>[] AreaCollisionTrees { get; } = { new(), new(), new() };
+    public Dictionary<string, BoxCollision9>[] AreaCollisionBoxes { get; } = { new(), new(), new() };
+    public Dictionary<string, bool>[] IsAtlantis { get; } = { new(), new(), new() };
 
     public PaldeaSceneModel(IFileInternal ROM, PaldeaFieldModel field)
     {
@@ -37,8 +37,8 @@ public class PaldeaSceneModel
         foreach (var obj in area_collision_su1.Objects)
             AddIfAppropriate(ROM, field, PaldeaFieldIndex.Kitakami, new List<TrinitySceneObjectTemplateEntry>(), obj);
 
-        foreach (var obj in area_collision_su1.Objects)
-            AddIfAppropriate(ROM, field, PaldeaFieldIndex.Blueberry, new List<TrinitySceneObjectTemplateEntry>(), obj);
+        //foreach (var obj in area_collision_su1.Objects)
+            //AddIfAppropriate(ROM, field, PaldeaFieldIndex.Blueberry, new List<TrinitySceneObjectTemplateEntry>(), obj);
     }
 
     private void AddIfAppropriate(IFileInternal ROM, PaldeaFieldModel field, PaldeaFieldIndex index, IList<TrinitySceneObjectTemplateEntry> atlantis, TrinitySceneObjectTemplateEntry obj)

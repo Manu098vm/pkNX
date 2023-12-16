@@ -8,8 +8,8 @@ namespace pkNX.WinForms;
 
 public class PaldeaFixedSymbolModel
 {
-    public readonly List<PaldeaFixedSymbolPoint>[] scarletPoints = new List<PaldeaFixedSymbolPoint>[] { new(), new() };
-    public readonly List<PaldeaFixedSymbolPoint>[] violetPoints = new List<PaldeaFixedSymbolPoint>[] { new(), new() };
+    public readonly List<PaldeaFixedSymbolPoint>[] scarletPoints = new List<PaldeaFixedSymbolPoint>[] { new(), new(), new() };
+    public readonly List<PaldeaFixedSymbolPoint>[] violetPoints = new List<PaldeaFixedSymbolPoint>[] { new(), new(), new() };
 
     public PaldeaFixedSymbolModel(IFileInternal ROM)
     {

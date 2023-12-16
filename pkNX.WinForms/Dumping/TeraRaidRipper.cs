@@ -77,7 +77,7 @@ public static class TeraRaidRipper
                 enc.Enemy.Info.SerializePKHeX(bw, (byte)enc.Stars, enc.Rate, RaidSerializationFormat.BaseROM);
                 bw.Write(rmS);
                 bw.Write(rmV);
-                enc.Enemy.Info.SerializeTeraFinder(bw);
+                //enc.Enemy.Info.SerializeTeraFinder(bw);
             }
         }
     }

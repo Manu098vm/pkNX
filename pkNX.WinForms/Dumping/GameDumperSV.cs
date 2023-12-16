@@ -394,7 +394,10 @@ public class GameDumperSV
                 static ushort GetArg(EvolutionType type, ushort arg)
                 {
                     if (type.IsPlibUseItemType())
-                        return Plib9.PlibToItem[arg];
+                    {
+                        if (arg <= (byte)EvolutionType.UseMoveStrongStyle)
+                            return Plib9.PlibToItem[arg];
+                    }
                     return arg;
                 }
             }
@@ -442,12 +445,12 @@ public class GameDumperSV
 
     public void DumpMisc()
     {
+        DumpGrow();
         DumpBalloon();
         DumpBattle();
         DumpEncount();
         DumpDLC();
         DumpGymRewards();
-        DumpGrow();
         DumpAudio();
         DumpAjito();
         DumpField();
@@ -568,9 +571,9 @@ public class GameDumperSV
         Dump<FieldSubAreaArray, FieldSubArea>("world/data/field/area_su1/field_sub_area_su1/field_sub_area_su1_array.bfbs", z => z.Table);
         Dump<FieldDungeonAreaArray, FieldDungeonArea>("world/data/field/area_su2/field_dungeon_area_su2/field_dungeon_area_su2_array.bfbs", z => z.Table);
         Dump<FieldInsideAreaArray, FieldInsideArea>("world/data/field/area_su2/field_inside_area_su2/field_inside_area_su2_array.bfbs", z => z.Table);
-        Dump<FieldLocationArray, FieldLocation>("world/data/field/area_su2/field_location_su2/field_location_su2_array.bfbs", z => z.Table);
+        //Dump<FieldLocationArray, FieldLocation>("world/data/field/area_su2/field_location_su2/field_location_su2_array.bfbs", z => z.Table);
         Dump<FieldMainAreaArray, FieldMainArea>("world/data/field/area_su2/field_main_area_su2/field_main_area_su2_array.bfbs", z => z.Table);
-        Dump<FieldSubAreaArray, FieldSubArea>("world/data/field/area_su2/field_sub_area_su2/field_sub_area_su2_array.bfbs", z => z.Table);
+        //Dump<FieldSubAreaArray, FieldSubArea>("world/data/field/area_su2/field_sub_area_su2/field_sub_area_su2_array.bfbs", z => z.Table);
 
         const string gifts = "world/data/event/event_add_pokemon/eventAddPokemon/eventAddPokemon_array.bfbs";
         Dump<EventAddPokemonArray, EventAddPokemon>(gifts, z => z.Table);
@@ -681,12 +684,12 @@ public class GameDumperSV
         };
         var su2Raids = new[]
         {
-            "world/data/raid/su1_raid_enemy_01/su1_raid_enemy_01_array.bfbs",
-            "world/data/raid/su1_raid_enemy_02/su1_raid_enemy_02_array.bfbs",
-            "world/data/raid/su1_raid_enemy_03/su1_raid_enemy_03_array.bfbs",
-            "world/data/raid/su1_raid_enemy_04/su1_raid_enemy_04_array.bfbs",
-            "world/data/raid/su1_raid_enemy_05/su1_raid_enemy_05_array.bfbs",
-            "world/data/raid/su1_raid_enemy_06/su1_raid_enemy_06_array.bfbs",
+            "world/data/raid/su2_raid_enemy_01/su2_raid_enemy_01_array.bfbs",
+            "world/data/raid/su2_raid_enemy_02/su2_raid_enemy_02_array.bfbs",
+            "world/data/raid/su2_raid_enemy_03/su2_raid_enemy_03_array.bfbs",
+            "world/data/raid/su2_raid_enemy_04/su2_raid_enemy_04_array.bfbs",
+            "world/data/raid/su2_raid_enemy_05/su2_raid_enemy_05_array.bfbs",
+            "world/data/raid/su2_raid_enemy_06/su2_raid_enemy_06_array.bfbs",
         };
 
         foreach (var f in mainRaids.Concat(su1Raids).Concat(su2Raids))
@@ -1059,7 +1062,7 @@ public class GameDumperSV
             "world/data/field/area_su1/field_inside_area_su1/field_inside_area_su1_array.bfbs",
             "world/data/field/area_su2/field_inside_area_su2/field_inside_area_su2_array.bfbs",
             "world/data/field/area_su1/field_location_su1/field_location_su1_array.bfbs",
-            "world/data/field/area_su2/field_location_su2/field_location_su2_array.bfbs",
+            //"world/data/field/area_su2/field_location_su2/field_location_su2_array.bfbs",
             "world/data/field/area_su2/field_main_area_su2/field_main_area_su2_array.bfbs",
             "world/data/field/area_su1/field_sub_area_su1/field_sub_area_su1_array.bfbs",
             "world/data/field/area_su2/field_sub_area_su2/field_sub_area_su2_array.bfbs",
@@ -1222,6 +1225,10 @@ public class GameDumperSV
         };
         foreach (var f in files)
         {
+            if (f.Contains("su2"))
+            {
+                var test = true;
+            }
             DumpPackedFile(f);
             DumpPackedFile(Path.ChangeExtension(f, ".bin"));
         }
