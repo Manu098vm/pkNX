@@ -126,11 +126,11 @@ public static class MassOutbreakRipper
     {
         var dpF0 = ROM.GetPackedFile("world/data/encount/point_data/outbreak_point_data/outbreak_point_main.bin");
         var dpF1 = ROM.GetPackedFile("world/data/encount/point_data/outbreak_point_data/outbreak_point_su1.bin");
-      //var dpF2 = ROM.GetPackedFile("world/data/encount/point_data/outbreak_point_data/outbreak_point_su2.bin");
+        var dpF2 = ROM.GetPackedFile("world/data/encount/point_data/outbreak_point_data/outbreak_point_su2.bin");
 
         var pointsF0 = FlatBufferConverter.DeserializeFrom<OutbreakPointArray>(dpF0).Table;
         var pointsF1 = FlatBufferConverter.DeserializeFrom<OutbreakPointArray>(dpF1).Table;
-      //var pointsF2 = FlatBufferConverter.DeserializeFrom<OutbreakPointArray>(dpF2).Table;
+        var pointsF2 = FlatBufferConverter.DeserializeFrom<OutbreakPointArray>(dpF2).Table;
 
         var field = new PaldeaFieldModel(ROM);
         var scene = new PaldeaSceneModel(ROM, field);
@@ -138,7 +138,7 @@ public static class MassOutbreakRipper
         ScanAssertions(pd);
         AddForMap(pointsF0, f0, pd, scene, NameDict, PaldeaFieldIndex.Paldea, 6);
         AddForMap(pointsF1, f1, pd, scene, NameDict, PaldeaFieldIndex.Kitakami, 132);
-      //AddForMap(pointsF2, f2, pd, scene, NameDict, PaldeaFieldIndex.Blueberry, 170);
+        AddForMap(pointsF2, f2, pd, scene, NameDict, PaldeaFieldIndex.Blueberry, 170);
     }
 
     private static void ScanAssertions(params DeliveryOutbreakPokeDataArray[] obs)
@@ -172,6 +172,12 @@ public static class MassOutbreakRipper
         var areaNames = scene.AreaNames[(int)fieldIndex];
         var atlantis = scene.IsAtlantis[(int)fieldIndex];
         if (fieldIndex == PaldeaFieldIndex.Kitakami)
+        {
+            areas = areas.Where(z => z.Value.AdjustEncLv != 0)
+                .ToDictionary(z => z.Key, z => z.Value);
+            areaNames = areas.Keys.ToList();
+        }
+        if (fieldIndex == PaldeaFieldIndex.Blueberry)
         {
             areas = areas.Where(z => z.Value.AdjustEncLv != 0)
                 .ToDictionary(z => z.Key, z => z.Value);

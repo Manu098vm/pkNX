@@ -32,6 +32,16 @@ public class PaldeaFixedSymbolModel
 
         scarletPoints[(int)PaldeaFieldIndex.Kitakami].AddRange(GetObjectTemplateSymbolPoints(k0));
         violetPoints[(int)PaldeaFieldIndex.Kitakami].AddRange(GetObjectTemplateSymbolPoints(k1));
+
+        // Blueberry
+        var b0Data = ROM.GetPackedFile("world/scene/parts/field/streaming_event/su2_world_fixed_placement_symbol_/su2_world_fixed_placement_symbol_0.trscn");
+        var b1Data = ROM.GetPackedFile("world/scene/parts/field/streaming_event/su2_world_fixed_placement_symbol_/su2_world_fixed_placement_symbol_1.trscn");
+
+        var b0 = FlatBufferConverter.DeserializeFrom<TrinitySceneObjectTemplate>(b0Data);
+        var b1 = FlatBufferConverter.DeserializeFrom<TrinitySceneObjectTemplate>(b1Data);
+
+        scarletPoints[(int)PaldeaFieldIndex.Blueberry].AddRange(GetObjectTemplateSymbolPoints(b0));
+        violetPoints[(int)PaldeaFieldIndex.Blueberry].AddRange(GetObjectTemplateSymbolPoints(b1));
     }
 
     private IEnumerable<PaldeaFixedSymbolPoint> GetObjectTemplateSymbolPoints(TrinitySceneObjectTemplate template)

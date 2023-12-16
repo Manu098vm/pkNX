@@ -36,6 +36,9 @@ public class PaldeaSceneModel
 
         foreach (var obj in area_collision_su1.Objects)
             AddIfAppropriate(ROM, field, PaldeaFieldIndex.Kitakami, new List<TrinitySceneObjectTemplateEntry>(), obj);
+
+        foreach (var obj in area_collision_su1.Objects)
+            AddIfAppropriate(ROM, field, PaldeaFieldIndex.Blueberry, new List<TrinitySceneObjectTemplateEntry>(), obj);
     }
 
     private void AddIfAppropriate(IFileInternal ROM, PaldeaFieldModel field, PaldeaFieldIndex index, IList<TrinitySceneObjectTemplateEntry> atlantis, TrinitySceneObjectTemplateEntry obj)
