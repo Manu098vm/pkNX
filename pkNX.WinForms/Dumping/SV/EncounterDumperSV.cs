@@ -39,8 +39,10 @@ public class EncounterDumperSV
         var mlEncPoints = FlatBufferConverter.DeserializeFrom<PointDataArray>(ROM.GetPackedFile("world/data/encount/point_data/point_data/encount_data_100000.bin"));
         var alEncPoints = FlatBufferConverter.DeserializeFrom<PointDataArray>(ROM.GetPackedFile("world/data/encount/point_data/point_data/encount_data_atlantis.bin"));
         var su1EncPoints = FlatBufferConverter.DeserializeFrom<PointDataArray>(ROM.GetPackedFile("world/data/encount/point_data/point_data/encount_data_su1.bin"));
+        var su2EncPoints = FlatBufferConverter.DeserializeFrom<PointDataArray>(ROM.GetPackedFile("world/data/encount/point_data/point_data/encount_data_su2.bin"));
         var pokeDataMain = FlatBufferConverter.DeserializeFrom<EncountPokeDataArray>(ROM.GetPackedFile("world/data/encount/pokedata/pokedata/pokedata_array.bin"));
         var pokeDataSu1 = FlatBufferConverter.DeserializeFrom<EncountPokeDataArray>(ROM.GetPackedFile("world/data/encount/pokedata/pokedata_su1/pokedata_su1_array.bin"));
+        var pokeDataSu2 = FlatBufferConverter.DeserializeFrom<EncountPokeDataArray>(ROM.GetPackedFile("world/data/encount/pokedata/pokedata_su2/pokedata_su2_array.bin"));
 
         var db = new LocationDatabase();
 
@@ -48,10 +50,12 @@ public class EncounterDumperSV
         var pointMain = ReformatPoints(mlEncPoints);
         var pointAtlantis = ReformatPoints(alEncPoints);
         var pointSu1 = ReformatPoints(su1EncPoints);
+        var pointSu2 = ReformatPoints(su2EncPoints);
 
         // Process all field indices
         ProcessAreas(PaldeaFieldIndex.Paldea);
         ProcessAreas(PaldeaFieldIndex.Kitakami);
+        ProcessAreas(PaldeaFieldIndex.Terarium);
 
         // Each area and their local / crossover points have been aggregated.
         // Integrate the points' slots into a single list, and consolidate entries with same level ranges to as few objects as possible.
@@ -89,18 +93,18 @@ public class EncounterDumperSV
         foreach (var (game, gamePoints) in new[] { ("sl", fsym.scarletPoints), ("vl", fsym.violetPoints) })
         {
             using var gw = File.CreateText(Path.Combine(path, $"titan_fixed_{game}.txt"));
-            foreach (var fieldIndex in new[] { PaldeaFieldIndex.Paldea, PaldeaFieldIndex.Kitakami })
+            foreach (var fieldIndex in new[] { PaldeaFieldIndex.Paldea, PaldeaFieldIndex.Kitakami, PaldeaFieldIndex.Terarium })
             {
                 var areaNames = scene.AreaNames[(int)fieldIndex];
                 var areas = scene.AreaInfos[(int)fieldIndex];
                 var atlantis = scene.IsAtlantis[(int)fieldIndex];
                 var allPoints = gamePoints[(int)fieldIndex];
 
-                if (fieldIndex == PaldeaFieldIndex.Kitakami)
+                if (fieldIndex is PaldeaFieldIndex.Kitakami)
                 {
                     areas = areas.Where(z => z.Value.AdjustEncLv != 0)
                         .ToDictionary(z => z.Key, z => z.Value);
-                    areaNames = areas.Keys.ToList();
+                    areaNames = [.. areas.Keys];
                 }
 
                 for (var i = 0; i < fsymData.Table.Count; i++)
@@ -137,11 +141,11 @@ public class EncounterDumperSV
                                 var pt = point.Position;
                                 if (!collider.ContainsPoint(pt.X, pt.Y, pt.Z))
                                     continue;
-                                if (!TryGetPlaceName(ref areaName, areaInfo, pt, placeNameMap, areas, scene, fieldIndex, out var placeName))
+                                var tmp = areaName;
+                                if (!TryGetPlaceName(ref tmp, areaInfo, pt, placeNameMap, areas, scene, fieldIndex, out var placeName))
                                     continue;
-                                areaName = areaNames[x];
-                                if (!appearAreas.Exists(z => z.Point == pt && z.AreaName == areaName))
-                                    appearAreas.Add(new(placeName, areaName, areaInfo.AdjustEncLv, pt));
+                                if (!appearAreas.Exists(z => z.Point == pt && z.AreaName == tmp))
+                                    appearAreas.Add(new(placeName, tmp, areaInfo.AdjustEncLv, pt));
                                 points.RemoveAt(p);
                                 p--;
                             }
@@ -346,6 +350,7 @@ public class EncounterDumperSV
         {
             PaldeaFieldIndex.Paldea => isAtlantis ? pointAtlantis : pointMain,
             PaldeaFieldIndex.Kitakami => pointSu1,
+            PaldeaFieldIndex.Terarium => pointSu2,
             _ => throw new ArgumentException($"Could not handle {fieldIndex}"),
         };
 
@@ -353,6 +358,7 @@ public class EncounterDumperSV
         {
             PaldeaFieldIndex.Paldea => pokeDataMain,
             PaldeaFieldIndex.Kitakami => pokeDataSu1,
+            PaldeaFieldIndex.Terarium => pokeDataSu2,
             _ => throw new ArgumentException($"Could not handle {fieldIndex}"),
         };
 
@@ -387,7 +393,7 @@ public class EncounterDumperSV
 
                 // Locations that do not spawn encounters can still have crossovers bleed into them.
                 // We'll have empty local encounter lists for them.
-                var storage = db.Get(placeNameMap[placeName].Index, fieldIndex, areaName, areaInfo);
+                var storage = db.Get(placeNameMap[placeName].Index, fieldIndex, areaName, areas[areaName]);
                 if (areaInfo.Tag is AreaTag.NG_Encount or AreaTag.NG_All)
                     continue;
 
@@ -629,8 +635,13 @@ public class EncounterDumperSV
         using var ms = new MemoryStream();
         using var bw = new BinaryWriter(ms);
 
-        bw.Write(SpeciesConverterSV.GetNational9((ushort)enc.DevId));
-        bw.Write((byte)enc.FormId);
+        ushort species = SpeciesConverterSV.GetNational9((ushort)enc.DevId);
+        byte form = (byte)enc.FormId;
+        if (species == (int)Species.Minior)
+            form = 31; // Form Random
+
+        bw.Write(species);
+        bw.Write(form);
         bw.Write((byte)(enc.Level + adjustLevel));
 
         bw.Write((byte)enc.TalentVNum);
@@ -680,10 +691,16 @@ public class EncounterDumperSV
         bw.Write(crossover);
         foreach (var slot in slots)
         {
-            byte form = slot.Species is (ushort)Species.Vivillon or (ushort)Species.Spewpa or (ushort)Species.Scatterbug ? (byte)30 : slot.Form;
+            ushort species = slot.Species;
+            byte form = slot.Species switch
+            {
+                (ushort)Species.Vivillon or (ushort)Species.Spewpa or (ushort)Species.Scatterbug => 30,
+                (ushort)Species.Minior => 31,
+                _ => slot.Form,
+            };
 
             // ReSharper disable RedundantCast
-            bw.Write((ushort)slot.Species);
+            bw.Write(species);
             bw.Write(form);
             bw.Write((byte)slot.Gender);
 
