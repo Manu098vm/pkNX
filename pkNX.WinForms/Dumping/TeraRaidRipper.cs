@@ -111,12 +111,12 @@ public static class TeraRaidRipper
     }
 
     private static readonly int[][] StageStars =
-    {
-        new [] { 1, 2 },
-        new [] { 1, 2, 3 },
-        new [] { 1, 2, 3, 4 },
-        new [] { 3, 4, 5, 6, 7 },
-    };
+    [
+        [1, 2],
+        [1, 2, 3],
+        [1, 2, 3, 4],
+        [3, 4, 5, 6, 7],
+    ];
 
     public static void DumpDistributionRaids(IFileInternal ROM, string path)
     {
@@ -150,13 +150,21 @@ public static class TeraRaidRipper
         var priority = Path.Combine(path, "raid_priority_array");
         const string v130 = "_1_3_0";
         const string v200 = "_2_0_0";
+        const string v300 = "_3_0_0";
 
         if (!File.Exists(enemy))
             return;
 
         // Starting with Ver. 1.3.0, BCAT is distributed with patch-specific binaries, in addition to the original base game binaries (e.g. raid_enemy_array_1_3_0).
         // The original data is dummied out, while the latest patch-specific data contains the raids we want to parse.
-        if (File.Exists(enemy + v200))
+        if (File.Exists(enemy + v300))
+        {
+            enemy += v300;
+            reward += v300;
+            lottery += v300;
+            priority += v300;
+        }
+        else if (File.Exists(enemy + v200))
         {
             enemy += v200;
             reward += v200;

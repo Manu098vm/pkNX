@@ -11,11 +11,11 @@ public class LocationStorage
     public readonly AreaInfo AreaInfo;
     public readonly string AreaName;
 
-    public readonly HashSet<ulong> Added = new();
-    public readonly List<PaldeaEncounter> Slots = new();
-    public readonly Dictionary<int, LocationStorage> SlotsCrossover = new();
-    public readonly List<LocationPointDetail> Local = new();
-    public readonly List<LocationPointDetail> Nearby = new();
+    public readonly HashSet<ulong> Added = [];
+    public readonly List<PaldeaEncounter> Slots = [];
+    public readonly Dictionary<int, LocationStorage> SlotsCrossover = [];
+    public readonly List<LocationPointDetail> Local = [];
+    public readonly List<LocationPointDetail> Nearby = [];
 
     public LocationStorage(int loc, PaldeaFieldIndex fieldIndex, string areaName, AreaInfo info)
     {
@@ -212,7 +212,12 @@ public class LocationStorage
             if (areaName[i] != ',')
                 continue;
             var name = areaName[start..i];
-            if (int.TryParse(name, out var tmp) && areaNo == tmp)
+
+            // In Paldea, only Surskit has: 1,4.5,7
+            // It shows up in 4, but not 5. No other encounters have `.` -- only `,`.
+            // We can just check as floats, and the last as int.
+            // Maybe they changed it since release, dunno. 3.0.0 gives us Surskit @ 4.
+            if (float.TryParse(name, out var tmp) && areaNo == (int)tmp)
                 return true;
             start = i + 1;
         }
