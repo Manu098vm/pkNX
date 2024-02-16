@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Windows.Controls;
 using pkNX.Containers;
 using pkNX.Structures;
 using pkNX.Structures.FlatBuffers;
@@ -56,7 +57,18 @@ public static class TeraRaidRipper
 
         var rateString = string.Join(Environment.NewLine, rateTotal.Select((z, i) => $"{i}\t{z.Scarlet}\t{z.Violet}"));
         File.WriteAllText(Path.Combine(outPath, rateFileName), rateString);
+
+        var black = all.Where(z => z.Stars == 6);
+        var standard = all.Where(z => z.Stars != 6);
+
         WritePickle(outPath, all, pickleFileName);
+
+        string standardFileName = pickleFileName.Replace(".pkl", "_standard.pkl");
+        WritePickle(outPath, standard, standardFileName);
+
+        string blackFileName = pickleFileName.Replace(".pkl", "_black.pkl");
+        WritePickle(outPath, black, blackFileName);
+
         // Raids can be shared, and show up with the same met location regardless of shared vs not.
         // No need to differentiate.
         // var scarlet = all.Where(z => z.Enemy.Info.RomVer != RaidRomType.TYPE_B);
