@@ -10,12 +10,15 @@ public partial struct PackedVec3f : IEquatable<PackedVec3f>
 
     public static explicit operator PackedVec3f(Vec3f v) => new() { X = v.X, Y = v.Y, Z = v.Z };
 
+    // ReSharper disable once ConvertToPrimaryConstructor
+#pragma warning disable IDE0290 // Use primary constructor
     public PackedVec3f(float x = 0, float y = 0, float z = 0)
     {
         X = x;
         Y = y;
         Z = z;
     }
+#pragma warning restore IDE0290 // Use primary constructor
 
     public readonly bool IsOne() => X is 1 && Y is 1 && Z is 1;
     public readonly bool IsZero() => X is 0 && Y is 0 && Z is 0;
