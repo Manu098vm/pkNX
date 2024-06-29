@@ -164,9 +164,6 @@ public static class TeraRaidRipper
         const string v200 = "_2_0_0";
         const string v300 = "_3_0_0";
 
-        if (!File.Exists(enemy))
-            return;
-
         // Starting with Ver. 1.3.0, BCAT is distributed with patch-specific binaries, in addition to the original base game binaries (e.g. raid_enemy_array_1_3_0).
         // The original data is dummied out, while the latest patch-specific data contains the raids we want to parse.
         if (File.Exists(enemy + v300))
@@ -190,6 +187,9 @@ public static class TeraRaidRipper
             lottery += v130;
             priority += v130;
         }
+
+        if (!File.Exists(enemy))
+            return;
 
         var dataEncounters = GetDistributionContents(enemy);
         var dataDrop = GetDistributionContents(Path.Combine(path, reward));
